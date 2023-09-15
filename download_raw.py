@@ -1,0 +1,1 @@
+# Download the raw data of dropsondes from https://www.aoml.noaa.gov/ftp/hrd/data/dropsonde/
