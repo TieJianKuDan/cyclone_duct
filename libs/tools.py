@@ -1,60 +1,11 @@
-from datetime import datetime
-import numpy as np
 import requests
 import os
 import shutil
 import re
 import sys
-
-# Data entry of the sonde
-sonde_info = {"time": 0, "lat": 1, "lon": 2, "press": 3,
-              "temp": 4, "humid": 5, "height": 6, "ZW": 7, "MW": 8}
-
-
-def read_hsa(file_path):  # Read the .hsa file
-    records = []
-    with open(file_path, 'r') as file:
-        while True:
-            line = file.readline()
-            if not line:
-                break
-            line = line.split()
-            if len(line[2]) == 1:
-                line[2] = "000" + line[2]
-            elif len(line[2]) == 3:
-                line[2] = "0" + line[2]
-            time = datetime.strptime("20" + line[1] + line[2], r"%Y%m%d.%H%M")
-            records.append([time, float(line[3]), -float(line[4]), float(line[5]), float(
-                line[6]), float(line[7]), float(line[8]), float(line[9]), float(line[10])])
-    return np.array(records)
-
-
-def is_normal(record):  # Judge whether the record is normal
-    if -99.0 in record:
-        return False
-    else:
-        return True
-
-
-def select_record(records):  # Select the normal record closest to the time of release
-    selected = []
-    flag = records[0, :]
-    if is_normal(flag):
-        selected.append(flag)
-    for record in records:
-        if record[1] != flag[1] or record[2] != flag[2]:
-            flag = record
-            if is_normal(flag):
-                selected.append(flag)
-        else:
-            if is_normal(record):
-                if (len(selected) == 0) \
-                    or (selected[-1][1] != flag[1]) \
-                        or (selected[-1][2] != flag[2]):
-                    selected.append(record)
-                else:
-                    selected[-1] = record
-    return np.array(selected)
+import pandas as pd
+import numpy as np
+from datetime import datetime
 
 
 def download_package(url, path):  # Download package from url and save to path
@@ -73,7 +24,63 @@ def download_package(url, path):  # Download package from url and save to path
     return
 
 
-class Logger(object):
+def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
+    lons_c = cyclones.usa_lon.data
+    lats_c = cyclones.usa_lat.data
+    sids = cyclones.sid.data
+    # According to season
+    date_s = sonde.reference_time.data[0]  # numpy.datetime64
+    season = pd.to_datetime(date_s).to_pydatetime().year
+    mask = np.where(cyclones.season.data == season)
+    lons_c = lons_c[mask]
+    lats_c = lats_c[mask]
+    sids = sids[mask]
+    # According to date
+    dates_c = cyclones.iso_time.data[mask]  # numpy.bytes
+    starts_c = dates_c[:, 0]
+    starts_c = np.array([np.datetime64(start)
+                        for start in starts_c])  # numpy.datetime64
+    mask = np.where(starts_c <= date_s)
+    lons_c = lons_c[mask]
+    lats_c = lats_c[mask]
+    dates_c = dates_c[mask]
+    ends_c = np.array([date[np.where(date != b"")][-1]
+                       for date in dates_c])  # numpy.bytes
+    ends_c = np.array([np.datetime64(end)
+                       for end in ends_c])  # numpy.datetime64
+    mask = np.where(ends_c >= date_s)
+    lons_c = lons_c[mask]
+    lats_c = lats_c[mask]
+    sids = sids[mask]
+    dates_c = dates_c[mask]
+    # According to site
+    date_s = pd.to_datetime(date_s).timestamp()
+    site_index = [0]*len(dates_c)
+    for i in range(0, len(dates_c)):
+        gap = np.Inf
+        for j in range(0, len(dates_c[i, :])):
+            temp = abs(date_s - datetime.strptime(
+                bytes(dates_c[i, j]).decode("utf-8"), r"%Y-%m-%d %H:%M:%S").timestamp())
+            if (gap > temp):
+                gap = temp
+            else:
+                site_index[i] = j - 1
+                break
+    distance = np.Inf
+    nearest = 0
+    lon_s = sonde.reference_lon.data[0]
+    lat_s = sonde.reference_lat.data[0]
+    for i in range(0, len(site_index)):
+        temp = (lons_c[i, site_index[i]] - lon_s)**2 + \
+            (lats_c[i, site_index[i]] - lat_s)**2
+        if temp < distance:
+            distance = temp
+            nearest = i
+    sid = sids[nearest]
+    return sid
+
+
+class Logger(object):  # Record the log and output to the console
     def __init__(self, filename='Default.log'):
         self.terminal = sys.stdout
         self.log = open(filename, 'a')
