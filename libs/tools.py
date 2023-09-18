@@ -1,5 +1,10 @@
 from datetime import datetime
 import numpy as np
+import requests
+import os
+import shutil
+import re
+import sys
 
 # Data entry of the sonde
 sonde_info = {"time": 0, "lat": 1, "lon": 2, "press": 3,
@@ -50,3 +55,32 @@ def select_record(records):  # Select the normal record closest to the time of r
                 else:
                     selected[-1] = record
     return np.array(selected)
+
+
+def download_package(url, path):  # Download package from url and save to path
+    temp_path = path + "temp.tar.gz"
+    unpack_path = path + re.split(r"[\._]", url.split("/")[-1])[0]
+    response = requests.get(url, stream=True)
+    with open(temp_path, 'xb') as fd:
+        for chunk in response.iter_content(chunk_size=1024):
+            fd.write(chunk)
+    if not os.path.isfile(temp_path):
+        print(f"Failed to download from {url}")
+        return
+    shutil.unpack_archive(temp_path, unpack_path)
+    os.remove(temp_path)
+    print(f"Successfully to download from {url} to {unpack_path}")
+    return
+
+
+class Logger(object):
+    def __init__(self, filename='Default.log'):
+        self.terminal = sys.stdout
+        self.log = open(filename, 'a')
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        pass

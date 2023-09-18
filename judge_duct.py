@@ -1,5 +1,4 @@
 # Judge whether is atmospheric duct in somewhere
-
 import libs.tools as tools
 
 if __name__ == "__main__":
