@@ -10,11 +10,11 @@ from datetime import datetime
 
 url = "https://www.aoml.noaa.gov/ftp/hrd/data/dropsonde/"
 
-# Record log
-sys.stdout = tools.Logger(
-    "logs/download_raw_" + datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S") + ".log")
-
 if __name__ == "__main__":
+    # Record log
+    sys.stdout = tools.Logger(
+        "logs/download_raw_" + datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S") + ".log")
+
     # Get download urls
     response = requests.get(url)
     if response.status_code != 200:

@@ -6,6 +6,8 @@ import sys
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import pygmt
+import matplotlib.pyplot as plt
 
 
 def download_package(url, path):  # Download package from url and save to path
@@ -78,6 +80,140 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
             nearest = i
     sid = sids[nearest]
     return sid
+
+
+def calc_e(T, rh):  # Calculate the vapour pressure (hPa)
+    # T -> atmospheric temperature (K)
+    # rh -> relative temperature
+    E = np.exp(np.subtract(np.subtract(
+        53.67957, np.divide(6743.769, T)), 4.8451*np.log(T)))
+    return np.multiply(E, rh)
+
+
+def calc_N(P, T, e):  # Calculate the atmospheric refraction index
+    # P -> atmospheric pressure (hPa)
+    # T -> atmospheric temperature (K)
+    # e -> vapour pressure (hPa)
+    return np.multiply(np.divide(77.6, T), np.add(P, np.divide(np.multiply(4810, e), T)))
+
+
+def get_alt(lon, lat):  # Get the altitude according to longitude and latitude
+    region = [lon - 1, lon + 1, lat - 1, lat + 1]
+    points = pd.DataFrame(data={"lon": [lon], "lat": [lat]})
+
+    grid = pygmt.grdlandmask(region=region, resolution="auto", spacing="0.05")
+    df = pygmt.grdtrack(points=points, grid=grid, newcolname="is_land")
+    if df.is_land[0] != 1:
+        return 0
+
+    grid = pygmt.datasets.load_earth_relief(
+        resolution="15s", region=region, data_source="synbath")
+    df = pygmt.grdtrack(points=points, grid=grid, newcolname="alt")
+    return df.alt[0]
+
+
+def is_duct(sonde, plot=False):  # Judge whether it is duct
+    is_duct = False
+    start = np.Inf
+    end = np.Inf
+    M_min = np.Inf
+    M_max = np.Inf
+    detaM = 0
+    duct_type = "none"
+    d = 0
+    C = 0
+    lamda = 0
+
+    lon = sonde.reference_lon.data[0]
+    lat = sonde.reference_lat.data[0]
+    alt_g = get_alt(lon, lat)
+
+    Ps = sonde.pres.data
+    s = pd.Series(Ps)
+    Ps = s.interpolate()
+
+    Ts = np.add(sonde.dp.data, 273.15)
+    s = pd.Series(Ts)
+    Ts = s.interpolate()
+
+    rhs = np.divide(sonde.rh.data, 100)
+    s = pd.Series(rhs)
+    rhs = s.interpolate()
+
+    alts = sonde.alt.data
+    s = pd.Series(alts)
+    alts = s.interpolate()
+
+    es = calc_e(Ts, rhs)
+    Ns = calc_N(Ps, Ts, es)
+    zs = np.subtract(alts, alt_g)
+    Ms = np.add(Ns, np.multiply(0.157, zs))
+
+    if len(zs[np.isnan(zs)]) > 0 or len(Ms[np.isnan(Ms)]) > 0:
+        print("error: data is so bad that failed to interpolate!")
+        duct_type = "error"
+        return (is_duct, duct_type)
+
+    dMs = np.diff(Ms)
+    dzs = np.diff(zs)
+    Ms = np.array(Ms[1::])
+    zs = np.array(zs[1::])
+    # Avoid nan for dividing zero
+    mask = np.where(np.abs(dzs) > 1e-10)
+    dMs = dMs[mask]
+    dzs = dzs[mask]
+    Ms = Ms[mask]
+    zs = zs[mask]
+    dM_dx = dMs/dzs
+
+    if plot:
+        fig = plt.figure(figsize=(10, 20))
+        ax1 = fig.add_subplot(2, 1, 1)
+        ax1.set_xlabel("M")
+        ax1.plot(Ms, zs, "-*")
+
+        ax2 = fig.add_subplot(2, 1, 2)
+        ax2.set_xlabel("dM/dz")
+        ax2.set_ylabel("z")
+        ax2.plot(dM_dx, zs, "-*")
+
+        if os.path.isfile("/imgs/temp.jpg"):
+            os.remove("/imgs/temp.jpg")
+        plt.savefig("./imgs/temp.jpg", dpi=300)
+
+    index = 0
+    while index < len(dM_dx):
+        if (dM_dx[index] < 0):
+            start = index
+            M_max = Ms[start]
+            for j in range(start, len(dM_dx)):
+                if (dM_dx[j] >= 0):
+                    end = j
+                    M_min = Ms[end]
+                    break
+            if (end == np.Inf):
+                duct_type = "error"
+                break
+            detaM = M_max - M_min
+            duct_type = "suspend"
+            d = zs[end] - zs[0]
+            C = 5.66e-3
+            for j in range(start, -1, -1):
+                if (Ms[j] <= M_min):
+                    duct_type = "surface"
+                    d = zs[end] - zs[j]
+                    C = 3.773e-3
+                    break
+            lamda = 2*C*d*np.sqrt(detaM)/3
+            if (lamda >= 0.5):
+                is_duct = True
+                break
+            index = end
+            duct_type = "none"
+            end = np.Inf
+        else:
+            index += 1
+    return (is_duct, duct_type)
 
 
 class Logger(object):  # Record the log and output to the console
