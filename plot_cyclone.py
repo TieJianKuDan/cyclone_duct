@@ -1,5 +1,5 @@
 # Plot the trajectory of cyclones and dropsondes
-from os import system
+import libs.banner
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt

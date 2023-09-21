@@ -2,3 +2,4 @@
 data/sondes/*
 imgs/*
 .vscode
+*.pyc

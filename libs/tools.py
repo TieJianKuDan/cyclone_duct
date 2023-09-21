@@ -1,12 +1,13 @@
-import requests
+
 import os
-import shutil
 import re
 import sys
+import pygmt
+import shutil
+import requests
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import pygmt
 import matplotlib.pyplot as plt
 
 
@@ -126,6 +127,10 @@ def is_duct(sonde, plot=False):  # Judge whether it is duct
 
     lon = sonde.reference_lon.data[0]
     lat = sonde.reference_lat.data[0]
+    if np.isnan(lon) or np.isnan(lat):
+        print("(+_+)?: error==>longitude or latitude is NaN ↓")
+        duct_type = "error"
+        return (is_duct, duct_type)
     alt_g = get_alt(lon, lat)
 
     Ps = sonde.pres.data
@@ -143,6 +148,10 @@ def is_duct(sonde, plot=False):  # Judge whether it is duct
     alts = sonde.alt.data
     s = pd.Series(alts)
     alts = s.interpolate()
+    if abs(alts[len(alts) - 1] - alts[0]) < 10:
+        print("(+_+)?: error==>error: data is not normal! Always at same altitude ↓")
+        duct_type = "error"
+        return (is_duct, duct_type)
 
     es = calc_e(Ts, rhs)
     Ns = calc_N(Ps, Ts, es)
@@ -150,26 +159,25 @@ def is_duct(sonde, plot=False):  # Judge whether it is duct
     Ms = np.add(Ns, np.multiply(0.157, zs))
 
     if len(zs[np.isnan(zs)]) > 0 or len(Ms[np.isnan(Ms)]) > 0:
-        print("error: data is so bad that failed to interpolate!")
+        print("(+_+)?: error==>error: data is so bad that failed to interpolate ↓")
         duct_type = "error"
         return (is_duct, duct_type)
 
     dMs = np.diff(Ms)
     dzs = np.diff(zs)
-    Ms = np.array(Ms[1::])
-    zs = np.array(zs[1::])
     # Avoid nan for dividing zero
     mask = np.where(np.abs(dzs) > 1e-10)
     dMs = dMs[mask]
     dzs = dzs[mask]
-    Ms = Ms[mask]
-    zs = zs[mask]
+    Ms = np.array(Ms)[mask]
+    zs = np.array(zs)[mask]
     dM_dx = dMs/dzs
 
     if plot:
         fig = plt.figure(figsize=(10, 20))
         ax1 = fig.add_subplot(2, 1, 1)
         ax1.set_xlabel("M")
+        ax1.set_ylabel("z")
         ax1.plot(Ms, zs, "-*")
 
         ax2 = fig.add_subplot(2, 1, 2)
