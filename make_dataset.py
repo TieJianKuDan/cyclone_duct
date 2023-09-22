@@ -1,20 +1,27 @@
+from datetime import datetime
 import libs.banner
 import libs.tools as tools
 import xarray as xr
 import numpy as np
 import pandas as pd
+import sys
 
 if __name__ == "__main__":
+    # Record log
+    sys.stdout = tools.Logger(
+        "logs/make_dataset_" + datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S") + ".log")
+    
     IBTrACS_path = "data/cyclones/IBTrACS.ALL.v04r00.nc"
     cyclones = xr.open_dataset(IBTrACS_path)
     good_sondes = pd.read_csv("data/sondes/good_sondes.csv")
+
     dataset = {"sonde": [], "hr": [], "tem": [], "u_wind": [], "v_wind": [], "sid": [
     ], "sshs": [], "rmw": [], "quad": [], "dist": [], "duct": []}
 
     for i in range(0, len(good_sondes)):
         sonde_path = good_sondes["sonde_path"][i]
+        print(f"==> {sonde_path}")
         sonde = xr.open_dataset(sonde_path)
-        print(sonde_path)
         sid, sshs, rmw, quad, dist = tools.find_cyclone(sonde, cyclones)
         if type(sid) == str:
             dataset["sonde"].append(sonde_path)
@@ -36,6 +43,6 @@ if __name__ == "__main__":
             dataset["rmw"].append(rmw)
             dataset["quad"].append(quad)
             dataset["dist"].append(dist)
-            dataset["duct"].append(good_sondes["duct_type"][i])
+            dataset["duct"].append(good_sondes["is_duct"][i])
 
     pd.DataFrame(dataset).to_csv("data/dataset.csv", index=False)

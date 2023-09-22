@@ -46,7 +46,13 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     sshss = cyclones.usa_sshs.data
     rmws = cyclones.usa_rmw.data
     # According to season
-    date_s = sonde.reference_time.data[0]  # numpy.datetime64
+    if not np.isnat(sonde.reference_time.data[0]):
+        date_s = sonde.reference_time.data[0]  # numpy.datetime64
+    elif not np.isnat(sonde.launch_time.data):
+        date_s = sonde.launch_time.data
+    else:
+        print("(+_+)?: error => don't know what time the sonde launched")
+        return (np.nan, np.nan, np.nan, np.nan, np.nan)
     season = pd.to_datetime(date_s).to_pydatetime().year
     mask = np.where(cyclones.season.data == season)
     lons_c = lons_c[mask]
@@ -107,6 +113,8 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
         lats_c[i, :] = s.interpolate()
         s = pd.Series(lons_c[i, :])
         lons_c[i, :] = s.interpolate()
+        if np.isnan(lats_c[i, site_index[i]]) or np.isnan(lons_c[i, site_index[i]]):
+            break
         temp = geodesic(
             (lat_s, lon_s), (lats_c[i, site_index[i]], lons_c[i, site_index[i]])).km
         if temp < dist:
