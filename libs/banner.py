@@ -65,4 +65,4 @@ if platform.system() == "Windows":
 else:
     os.system("clear")
 
-print(banner1)
+print(banner3)

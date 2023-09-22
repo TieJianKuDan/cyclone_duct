@@ -9,7 +9,7 @@ import os
 import libs.tools as tools
 
 if __name__ == "__main__":
-    sonde_path = "data/sondes/raw/AFRES15/20150605A1/g103115071QC.nc"
+    sonde_path = "data/sondes/qc/HURR1_/g062839207QC.nc"
     sonde = xr.open_dataset(sonde_path)
     IBTrACS_path = "data/cyclones/IBTrACS.ALL.v04r00.nc"
     cyclones = xr.open_dataset(IBTrACS_path)

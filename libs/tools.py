@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
+from geopy.distance import geodesic
 
 
 def download_package(url, path):  # Download package from url and save to path
@@ -27,10 +28,24 @@ def download_package(url, path):  # Download package from url and save to path
     return
 
 
+def deter_quad(lon_1, lat_1, lon_2, lat_2):  # Determin the quadrant of 2 about 1
+    # 1 is center
+    if lon_2 >= lon_1 and lat_2 >= lat_1:
+        return 1
+    elif lon_2 < lon_1 and lat_2 >= lat_1:
+        return 2
+    elif lon_2 < lon_1 and lat_2 < lat_1:
+        return 3
+    else:
+        return 4
+
+
 def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     lons_c = cyclones.usa_lon.data
     lats_c = cyclones.usa_lat.data
     sids = cyclones.sid.data
+    sshss = cyclones.usa_sshs.data
+    rmws = cyclones.usa_rmw.data
     # According to season
     date_s = sonde.reference_time.data[0]  # numpy.datetime64
     season = pd.to_datetime(date_s).to_pydatetime().year
@@ -38,6 +53,8 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     lons_c = lons_c[mask]
     lats_c = lats_c[mask]
     sids = sids[mask]
+    sshss = sshss[mask]
+    rmws = rmws[mask]
     # According to date
     dates_c = cyclones.iso_time.data[mask]  # numpy.bytes
     starts_c = dates_c[:, 0]
@@ -55,10 +72,17 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     lons_c = lons_c[mask]
     lats_c = lats_c[mask]
     sids = sids[mask]
+    sshss = sshss[mask]
+    rmws = rmws[mask]
     dates_c = dates_c[mask]
+    if len(dates_c) == 0:
+        print("(+_+)?: error => cannot find the corresponding cyclone")
+        return (np.nan, np.nan, np.nan, np.nan, np.nan)
     # According to site
     date_s = pd.to_datetime(date_s).timestamp()
     site_index = [0]*len(dates_c)
+    sshss_n = [np.nan]*len(dates_c)
+    rmws_n = [np.nan]*len(dates_c)
     for i in range(0, len(dates_c)):
         gap = np.Inf
         for j in range(0, len(dates_c[i, :])):
@@ -66,21 +90,30 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
                 bytes(dates_c[i, j]).decode("utf-8"), r"%Y-%m-%d %H:%M:%S").timestamp())
             if (gap > temp):
                 gap = temp
+                if not np.isnan(sshss[i, j]):
+                    sshss_n[i] = sshss[i, j]
+                if not np.isnan(rmws[i, j]):
+                    rmws_n[i] = rmws[i, j]
             else:
                 site_index[i] = j - 1
                 break
-    distance = np.Inf
+    dist = np.Inf
     nearest = 0
     lon_s = sonde.reference_lon.data[0]
     lat_s = sonde.reference_lat.data[0]
     for i in range(0, len(site_index)):
-        temp = (lons_c[i, site_index[i]] - lon_s)**2 + \
-            (lats_c[i, site_index[i]] - lat_s)**2
-        if temp < distance:
-            distance = temp
+        temp = geodesic(
+            (lat_s, lon_s), (lats_c[i, site_index[i]], lons_c[i, site_index[i]])).km
+        if temp < dist:
+            dist = temp
             nearest = i
     sid = sids[nearest]
-    return sid
+    sshs = sshss_n[nearest]
+    rmw = rmws_n[nearest]
+    lon_c = lons_c[nearest, site_index[nearest]]
+    lat_c = lats_c[nearest, site_index[nearest]]
+    quad = deter_quad(lon_c, lat_c, lon_s, lat_s)
+    return (sid, sshs, rmw, quad, dist)
 
 
 def calc_e(T, rh):  # Calculate the vapour pressure (hPa)
