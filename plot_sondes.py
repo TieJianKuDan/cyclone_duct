@@ -20,7 +20,8 @@ if __name__ == "__main__":
 
     # The longitude and latitude of cyclones
     sid = tools.find_cyclone(sonde, cyclones)
-    mask = np.where(cyclones.sid.data == sid)
+    mask = np.where(np.array([bytes(sid).decode("utf-8")
+                    for sid in cyclones.sid.data]) == sid[0])
     lon_c = cyclones.usa_lon.data[mask]
     lat_c = cyclones.usa_lat.data[mask]
 

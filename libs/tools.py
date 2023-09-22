@@ -1,4 +1,3 @@
-
 import os
 import re
 import sys
@@ -86,22 +85,28 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     for i in range(0, len(dates_c)):
         gap = np.Inf
         for j in range(0, len(dates_c[i, :])):
+            if len(dates_c[i, j]) == 0:
+                break
             temp = abs(date_s - datetime.strptime(
                 bytes(dates_c[i, j]).decode("utf-8"), r"%Y-%m-%d %H:%M:%S").timestamp())
             if (gap > temp):
                 gap = temp
+                site_index[i] = j
                 if not np.isnan(sshss[i, j]):
                     sshss_n[i] = sshss[i, j]
                 if not np.isnan(rmws[i, j]):
                     rmws_n[i] = rmws[i, j]
             else:
-                site_index[i] = j - 1
                 break
     dist = np.Inf
     nearest = 0
     lon_s = sonde.reference_lon.data[0]
     lat_s = sonde.reference_lat.data[0]
     for i in range(0, len(site_index)):
+        s = pd.Series(lats_c[i, :])
+        lats_c[i, :] = s.interpolate()
+        s = pd.Series(lons_c[i, :])
+        lons_c[i, :] = s.interpolate()
         temp = geodesic(
             (lat_s, lon_s), (lats_c[i, site_index[i]], lons_c[i, site_index[i]])).km
         if temp < dist:
@@ -113,7 +118,7 @@ def find_cyclone(sonde, cyclones):  # Find the corresponding cyclone
     lon_c = lons_c[nearest, site_index[nearest]]
     lat_c = lats_c[nearest, site_index[nearest]]
     quad = deter_quad(lon_c, lat_c, lon_s, lat_s)
-    return (sid, sshs, rmw, quad, dist)
+    return (bytes(sid).decode("utf-8"), sshs, rmw, quad, dist)
 
 
 def calc_e(T, rh):  # Calculate the vapour pressure (hPa)
@@ -129,6 +134,12 @@ def calc_N(P, T, e):  # Calculate the atmospheric refraction index
     # T -> atmospheric temperature (K)
     # e -> vapour pressure (hPa)
     return np.multiply(np.divide(77.6, T), np.add(P, np.divide(np.multiply(4810, e), T)))
+
+
+def calc_q(P, T, rh):  # Calculate the humidity ratio
+    e = calc_e(T, rh)
+    q = 0.622 * (e / P)
+    return q
 
 
 def get_alt(lon, lat):  # Get the altitude according to longitude and latitude
@@ -170,7 +181,7 @@ def is_duct(sonde, plot=False):  # Judge whether it is duct
     s = pd.Series(Ps)
     Ps = s.interpolate()
 
-    Ts = np.add(sonde.dp.data, 273.15)
+    Ts = np.add(sonde.tdry.data, 273.15)
     s = pd.Series(Ts)
     Ts = s.interpolate()
 

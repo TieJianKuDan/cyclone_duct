@@ -27,4 +27,4 @@ if __name__ == "__main__":
                     sondes["duct_type"].append(duct_type)
     df = pd.DataFrame(sondes)
     print(df)
-    df.to_csv("data/sondes/good_sondes.csv")
+    df.to_csv("data/sondes/good_sondes.csv", index=False)
