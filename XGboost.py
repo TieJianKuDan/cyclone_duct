@@ -6,9 +6,9 @@ from sklearn.metrics import accuracy_score
 
 if __name__ == "__main__":
     dataset_path = "data/dataset.csv"
-    dateset = pd.read_csv(dataset_path).sample(frac=1).dropna()
-    train = dateset.head(6000)
-    test = dateset.tail(1000)
+    dataset = pd.read_csv(dataset_path).sample(frac=1).dropna()
+    train = dataset.head(6000)
+    test = dataset.tail(1000)
     features = [x for x in train.columns if x not in ["sonde", "sid", "duct"]]
     train_f = np.array(train[features])
     train_l = np.array(train["duct"]).astype(int)
