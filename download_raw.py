@@ -28,7 +28,7 @@ if __name__ == "__main__":
     li_tags.pop(0)
     li_urls = [li_tag.a["href"] for li_tag in li_tags]
     raw_urls = [url + li_url + "raw/" for li_url in li_urls]
-    save_paths = ["./data/sondes/" + li_url for li_url in li_urls]
+    save_paths = ["./data/sondes/raw" + li_url for li_url in li_urls]
 
     for i in range(75, len(raw_urls)):
         print("========================>")

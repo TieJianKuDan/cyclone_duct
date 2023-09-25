@@ -65,4 +65,10 @@ if platform.system() == "Windows":
 else:
     os.system("clear")
 
+if not os.path.exists("./img"):
+    os.mkdir("./imgs")
+
+if not os.path.exists("./logs"):
+    os.mkdir("./logs")
+
 print(banner3)
