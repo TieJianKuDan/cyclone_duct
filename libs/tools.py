@@ -147,6 +147,8 @@ def calc_N(P, T, e):  # Calculate the atmospheric refraction index
 def calc_q(P, T, rh):  # Calculate the humidity ratio
     e = calc_e(T, rh)
     q = 0.622 * (e / P)
+    if np.isnan(q):
+        print("warn => hr is NaN")
     return q
 
 
