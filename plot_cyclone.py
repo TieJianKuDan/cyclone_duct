@@ -37,7 +37,7 @@ if __name__ == "__main__":
     ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=0))
     ax.coastlines()
     ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
-    ax.set_extent([-180, -180, -90, 90])
+    ax.set_extent([-180, 180, -90, 90])
     ax.add_feature(cfeature.OCEAN)
     ax.set_title('TCs from 2020 to 2020'+' ('+str(len(seasons_s))+')',
                  fontsize=15, loc='center')
